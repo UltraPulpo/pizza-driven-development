@@ -46,6 +46,23 @@ function toOrderInput(draft: Draft): OrderInput {
   }
 }
 
+function newDraft(menu: MenuDefinition): Draft {
+  return {
+    items: [{ id: crypto.randomUUID(), sizeId: menu.sizes[0].id, quantity: '1', toppingIds: [] }],
+    tip: { mode: 'dollars', value: '0' }, promoCode: null,
+  }
+}
+
+function toDraft(order: OrderInput): Draft {
+  return {
+    items: order.items.map(item => ({
+      id: crypto.randomUUID(), sizeId: item.sizeId, quantity: String(item.quantity), toppingIds: item.toppingIds,
+    })),
+    tip: order.tip,
+    promoCode: order.promoCode,
+  }
+}
+
 function App() {
   const [menu, setMenu] = useState<MenuDefinition | null>(null)
   const [menuError, setMenuError] = useState('')
@@ -55,7 +72,6 @@ function App() {
   const latestRevision = useRef(0)
   const [quoteResult, setQuoteResult] = useState<{ revision: number; quote?: PriceQuote; error?: string } | null>(null)
   const [showDescription, setShowDescription] = useState(false)
-  const [saveRevision, setSaveRevision] = useState<number | null>(null)
   const [submission, setSubmission] = useState<SubmissionState>({ phase: 'draft' })
 
   useEffect(() => {
@@ -64,13 +80,7 @@ function App() {
       if (controller.signal.aborted) return
       setMenu(result)
       const revision = ++latestRevision.current
-      setDraft({
-        order: {
-          items: [{ id: crypto.randomUUID(), sizeId: result.sizes[0].id, quantity: '1', toppingIds: [] }],
-          tip: { mode: 'dollars', value: '0' }, promoCode: null,
-        },
-        revision,
-      })
+      setDraft({ order: newDraft(result), revision })
     }).catch((error: unknown) => {
       if (!controller.signal.aborted) setMenuError(errorMessage(error))
     })
@@ -91,11 +101,10 @@ function App() {
     return () => controller.abort()
   }, [draft, menu])
 
-  function changeDraft(order: Draft, saving = false) {
+  function changeDraft(order: Draft) {
     const revision = ++latestRevision.current
     setDraft({ order, revision })
     setShowDescription(false)
-    setSaveRevision(saving ? revision : null)
   }
 
   function changeLine(id: string, changes: Partial<DraftLine>) {
@@ -108,11 +117,17 @@ function App() {
   const currentStatusKnown = accepted !== null && accepted.current !== null && !accepted.checking && !accepted.action && !accepted.error
   const canEditDraft = submission.phase === 'draft' || (currentStatusKnown && accepted?.current?.status === 'NotStarted')
 
+  // Once the order can no longer change, discard unsaved edits so the locked form shows what the restaurant has.
+  function discardEditsIfLocked(current: OrderView) {
+    if (current.status !== 'NotStarted') changeDraft(toDraft(current.order))
+  }
+
   async function checkStatus(receipt: SubmissionReceipt, previous: OrderView | null = null, notice?: string) {
     setSubmission({ phase: 'accepted', receipt, current: previous, checking: true, notice })
     try {
       const current = await getOrder(receipt.orderId)
       setSubmission({ phase: 'accepted', receipt, current, checking: false, notice })
+      discardEditsIfLocked(current)
     } catch (error) {
       setSubmission({ phase: 'accepted', receipt, current: previous, checking: false, error: errorMessage(error), notice })
     }
@@ -124,6 +139,7 @@ function App() {
       const current = action === 'cancel' ? await cancelOrder(receipt.orderId)
         : await updateOrder(receipt.orderId, toOrderInput(draft.order))
       setSubmission({ phase: 'accepted', receipt, current, checking: false })
+      discardEditsIfLocked(current)
     } catch (error) {
       const operation = action === 'cancel' ? 'Cancellation' : 'Update'
       const notice = error instanceof ApiError && error.status < 500
@@ -198,19 +214,18 @@ function App() {
           })} /></label>
           <p>One optional code: ILOVEPIZZA or SAVE5. Percentage tips use the discounted food subtotal before tax.</p>
         </fieldset>
-        {(submission.phase === 'draft' || accepted) && <button type="button"
-          disabled={!!accepted && (!currentStatusKnown || !currentQuote || accepted.current?.status !== 'NotStarted')}
+        {accepted && <button type="button"
+          disabled={!currentStatusKnown || !currentQuote || accepted.current?.status !== 'NotStarted'}
           onClick={() => {
-            if (accepted?.current) void mutateAccepted('update', accepted.receipt, accepted.current)
-            else changeDraft(draft.order, true)
-          }}>Save Changes</button>}
+            if (accepted.current) void mutateAccepted('update', accepted.receipt, accepted.current)
+          }}>Update Order</button>}
         {submission.phase === 'draft' && <>
           <button type="button" disabled={!currentQuote} onClick={() => {
             void sendSubmission(createSubmissionAttempt(toOrderInput(draft.order)))
           }}>Submit Order</button>
           <p>Changes are only a browser draft until you submit the order.</p>
         </>}
-        {accepted && <p>Draft edits are separate from the accepted order shown below.</p>}
+        {accepted && <p>Draft edits change the accepted order below only when you click Update Order.</p>}
         </fieldset>
 
         {submission.phase === 'draft' && submission.error && <p role="alert">{submission.error}</p>}
@@ -223,7 +238,7 @@ function App() {
           <h2>Order accepted</h2>
           <p>Order ID: {accepted.receipt.orderId}</p>
           {accepted.checking && <p role="status">Checking current status. Editing is locked.</p>}
-          {accepted.action && <p role="status">{accepted.action === 'cancel' ? 'Cancelling order...' : 'Saving changes...'}</p>}
+          {accepted.action && <p role="status">{accepted.action === 'cancel' ? 'Cancelling order...' : 'Updating order...'}</p>}
           {accepted.notice && <p role="alert">{accepted.notice}</p>}
           {accepted.error && <p role="alert">Order accepted, but current status is unavailable. {accepted.error} Use Check Status to recover.</p>}
           {accepted.current ? <>
@@ -235,7 +250,10 @@ function App() {
           <button type="button" disabled={!currentStatusKnown || accepted.current?.status !== 'NotStarted'} onClick={() => {
             if (accepted.current) void mutateAccepted('cancel', accepted.receipt, accepted.current)
           }}>Cancel Order</button>
-          <button type="button" disabled={!currentStatusKnown} onClick={() => setSubmission({ phase: 'draft' })}>Start New Order</button>
+          <button type="button" disabled={!currentStatusKnown} onClick={() => {
+            setSubmission({ phase: 'draft' })
+            changeDraft(newDraft(menu))
+          }}>Start New Order</button>
         </section>}
 
         <section aria-label="Current quote" aria-live="polite">
@@ -263,8 +281,6 @@ function App() {
             {showDescription ? 'Hide Description' : 'Show Description'}
           </button>
           {showDescription && currentQuote && <p>{currentQuote.description}</p>}
-          {submission.phase === 'draft' && currentQuote && saveRevision === draft.revision &&
-            <p role="status">Draft validated. Not submitted to the restaurant.</p>}
         </section>
       </>}
     </main>
