@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/pdd-api/PDD.API.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/pdd-api/">
+    <Project Path="tests/pdd-api/PDD.API.Tests.csproj" />
+  </Folder>
+</Solution>
