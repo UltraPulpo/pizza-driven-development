@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Data\schema.sql" LogicalName="PDD.API.Data.schema.sql" />
+    <Content Update="menu.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

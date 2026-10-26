@@ -173,6 +173,43 @@
     border: 5px solid transparent;
   }
 
+  main {
+    padding: 24px;
+    text-align: left;
+  }
+
+  main fieldset,
+  main section {
+    margin-block: 16px;
+  }
+
+  main label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 16px 6px 0;
+  }
+
+  main input:not([type="checkbox"]) {
+    width: 9em;
+  }
+
+  main button,
+  main select,
+  main input {
+    font: inherit;
+  }
+
+  main dl {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    gap: 6px 16px;
+  }
+
+  main dd {
+    margin: 0;
+  }
+
   &::before {
     left: 0;
     border-left-color: var(--border);
