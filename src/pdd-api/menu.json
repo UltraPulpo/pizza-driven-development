@@ -1,0 +1,25 @@
+{
+  "sizes": [
+    { "id": "small", "name": "Small", "basePriceCents": 500 },
+    { "id": "medium", "name": "Medium", "basePriceCents": 700 },
+    { "id": "large", "name": "Large", "basePriceCents": 1200 }
+  ],
+  "categories": [
+    { "id": "basic", "percentage": 8 },
+    { "id": "premium", "percentage": 11 }
+  ],
+  "toppings": [
+    { "id": "pepperoni", "name": "Pepperoni", "categoryId": "basic" },
+    { "id": "sausage", "name": "Sausage", "categoryId": "basic" },
+    { "id": "extra-cheese", "name": "Extra cheese", "categoryId": "basic" },
+    { "id": "onions", "name": "Onions", "categoryId": "basic" },
+    { "id": "black-olives", "name": "Black olives", "categoryId": "basic" },
+    { "id": "green-peppers", "name": "Green peppers", "categoryId": "basic" },
+    { "id": "bacon", "name": "Bacon", "categoryId": "premium" },
+    { "id": "chicken", "name": "Chicken", "categoryId": "premium" },
+    { "id": "garlic", "name": "Garlic", "categoryId": "premium" },
+    { "id": "artichoke-hearts", "name": "Artichoke hearts", "categoryId": "premium" },
+    { "id": "sun-dried-tomatoes", "name": "Sun-dried tomatoes", "categoryId": "premium" },
+    { "id": "pineapple", "name": "Pineapple", "categoryId": "premium" }
+  ]
+}

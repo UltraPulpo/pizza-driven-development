@@ -383,9 +383,9 @@ Also require the real two-process journey, stale-quote/timeout recovery checks, 
 
 | Task | Description | Prerequisites | Conflicts | Status |
 |------|-------------|---------------|-----------|--------|
-| 1.1 | Establish the minimal menu/network spine | None | None | [ ] |
-| 1.2 | Prove exact live quotes through the complete multi-line draft builder | 1.1 | None | [ ] |
-| C1 | Stabilize quote contracts; independently user-approved | 1.2 | None | [ ] |
+| 1.1 | Establish the minimal menu/network spine | None | None | [x] |
+| 1.2 | Prove exact live quotes through the complete multi-line draft builder | 1.1 | None | [x] |
+| C1 | Stabilize quote contracts; independently user-approved | 1.2 | None | [x] |
 | 3.1 | Prove durable submission/status HTTP contracts using C1 contracts | C1 | None | [ ] |
 | 3.2 | Integrate browser submission/recovery against 3.1's proven contracts | 3.1 | None | [ ] |
 | C2 | Review the combined persistence/retry slice before mutations | 3.2 | None | [ ] |
