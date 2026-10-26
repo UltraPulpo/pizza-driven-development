@@ -1,0 +1,2 @@
+-- Applied at API startup by DatabaseInitializer.
+-- Every statement must be idempotent (e.g. CREATE TABLE IF NOT EXISTS).
