@@ -42,6 +42,11 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Local-only: assessment brief, Office lock files, AI agent handoff notes
+docs/*.docx
+~$*
+/AGENTS.md
+
 # OS
 .DS_Store
 Thumbs.db
