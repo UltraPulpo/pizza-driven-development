@@ -1,0 +1,14 @@
+{
+  "extends": "../../src/pdd-web/tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../src/pdd-web/node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["../../src/pdd-web/node_modules/vite/client"],
+    "paths": {
+      "*": [
+        "../../src/pdd-web/node_modules/@types/*",
+        "../../src/pdd-web/node_modules/*"
+      ]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../../src/pdd-web/client"]
+}
