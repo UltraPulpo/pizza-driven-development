@@ -16,7 +16,9 @@
 
 **Unresolved decisions:** None blocking this revision. It applies only the six confirmed interview decisions; no additional UI behavior is prescribed. The user approved at most **two automatic repair rounds per checkpoint**. Significant design/scope changes still require an immediate user decision. C1 and C2 explicitly settle unproven implementation contracts before dependent work; their existence is not a claim those contracts already work.
 
-**Execution continuation:** Tasks 1.1/1.2 and C1 are complete. The user approved C1 and explicitly requested a local commit, then continuation to submission/retries. No persistence contract is established by the menu/quote slice; 3.1 must prove POST/GET before 3.2 consumes them.
+**Execution continuation:** Tasks 1.1/1.2/C1/3.1/3.2/C2 are complete. The user approved C2 and explicitly requested its local commit, then continuation. Task 4.1 is ready against the established C1/C2 contracts; lifecycle mutations remain unimplemented until 4.1/4.2 prove them.
+
+**Local history:** Authorized C1 increment committed as `0822511` (`Add data-driven menu and exact live order quotes`). Working tree was clean immediately afterward. Later work remains uncommitted unless separately requested.
 
 ## 2. Implementation Sequence and Shared Contracts
 
@@ -32,8 +34,8 @@
 | Menu, OrderInput, TipInput, PriceQuote, camelCase JSON and integer-cent wire fields | Established; C1 user-approved | Tasks 1.1/1.2 evidence and canonical implementation references below. |
 | `PricingService.Quote(OrderInput)` and `IPromoRule.GetDiscount(OrderInput, int subtotalCents)` | Established; C1 user-approved | API owns all validation, exact arithmetic, descriptions, promo eligibility, and structural single-promo exclusivity. |
 | Problem Details, `OrderException` kinds, WEB `ApiError`, finite 10-second timeout | Quote/input/helper paths established; C1 user-approved | API owns binding/business/error mapping; WEB preserves messages and distinguishes transport uncertainty. C2 still owes storage-failure behavior. |
-| OrderService async submit/get/update/cancel/advance methods, with cancellation tokens | Approved design; unimplemented | Task 3.1 proves submit/get before browser consumption in 3.2; 4.1 adds cancel/advance and 4.2 adds update using the existing pricing path. |
-| Receipt, current OrderView, immutable SubmissionAttempt, retry header and storage | Specified by LLD 3.2, 4.3, 5; unimplemented | Task 3.1 owns persistence/HTTP contracts; 3.2 owns browser recovery. C2 reviews their combined evidence before mutation expansion. |
+| OrderService async submit/get/update/cancel/advance methods, with cancellation tokens | Submit/get established; C2 user-approved. Mutations unimplemented. | Task 3.1 proves submit/get before browser consumption in 3.2; 4.1 adds cancel/advance and 4.2 adds update using the existing pricing path. |
+| Receipt, current OrderView, immutable SubmissionAttempt, retry header and storage | Established; C2 user-approved | Task 3.1 owns persistence/HTTP contracts; 3.2 owns browser recovery. 4.1/4.2 preserve original retry information. |
 | Status strings, expected-status advancement, conditional mutation outcomes | Specified by LLD 4.1/4.4/5; unimplemented | Task 4.1 proves progression/cancellation and the shared conditional-write/error pattern; 4.2 reuses it for updates. C3 reviews the integrated guarantees. |
 
 Use the LLD's existing endpoint contracts, not a new API design: GET menu, POST quote, POST orders with GUID `Idempotency-Key`, GET/PUT order, POST cancel, and POST advance with `expectedStatus`, all under `/api`. Keep health. Money is checked nonnegative int cents, calculated with decimal intermediates and midpoint-away-from-zero rounding; tip `value` stays decimal text. Quote, submit, and update share one pricing method. WEB only formats returned cents.
@@ -44,7 +46,11 @@ Only declare types as they acquire a real consumer. Group related records; no ge
 
 **C1 canonical implementation references (user-approved):** Menu records are in [`Models\Menu.cs`](../src/pdd-api/Models/Menu.cs); input, quote, and expected-error records are in [`Models\Order.cs`](../src/pdd-api/Models/Order.cs). [`MenuHttpTests.cs`](../tests/pdd-api/MenuHttpTests.cs) and [`QuoteHttpTests.cs`](../tests/pdd-api/QuoteHttpTests.cs) prove camelCase serialization, integer-cent components, and 400 Problem Details including binding errors. [`PricingTests.cs`](../tests/pdd-api/PricingTests.cs) proves the shared pricing/promo boundary. [`types.ts`](../src/pdd-web/client/types.ts) mirrors every menu/input/quote field; [`api.ts`](../src/pdd-web/client/api.ts) and [`api.test.ts`](../tests/pdd-web/api.test.ts) implement/prove raw tip text, HTTP errors versus transport/timeout, and the ten-second timeout. Tasks 3.1/3.2/4.1/4.2 consume these established contracts without changing their shapes; C2 still gates persistence-dependent mutations.
 
-Downstream packets are **provisional** until their contract gate passes: C1 may refine 3.1/3.2/4.1/4.2 against the actual quote/error interfaces; C2 may refine 4.1/4.2 against receipt/storage interfaces. Within the submission slice, 3.1 must prove its HTTP contracts before 3.2 consumes them; C2 remains the single independent integration review after both tasks. Update packets/tracker together. A later contract change requires a consumer/fixture/documentation impact assessment; ask the user when it exceeds the agreed design or scope.
+**C2 canonical server boundary (user-approved):** [`Models\Order.cs`](../src/pdd-api/Models/Order.cs) defines receipt/current-view/status contracts. [`OrderService.cs`](../src/pdd-api/Services/OrderService.cs), [`schema.sql`](../src/pdd-api/Data/schema.sql), and [`SubmissionHttpTests.cs`](../tests/pdd-api/SubmissionHttpTests.cs) prove POST/GET, original-receipt replay, typed-input matching, one-statement unique insertion, stored snapshots, and explicit 400/404/409/503/safe-500 responses. Tasks 4.1/4.2 extend the same concrete service, conditional SQL, DTOs, and error mapping without changing original retry fields.
+
+**C2 canonical browser references (user-approved):** Receipt/current-state/status/readonly-attempt types in [`types.ts`](../src/pdd-web/client/types.ts) mirror the passing C# wire contracts. [`api.ts`](../src/pdd-web/client/api.ts) captures/freeze-serializes an attempt once and resends its body/key without automatic writes. [`App.tsx`](../src/pdd-web/client/App.tsx) distinguishes unknown submission from accepted/status-unavailable, locks edits/new submissions until recovery, and keeps accepted state separate from the draft. The existing helper suite and 3.2 browser evidence below cover both recovery branches. Tasks 4.1/4.2 reuse this accepted-state/draft separation and current-quote gate. No C1 wire shape changed.
+
+C1/C2 are now user-approved and the implementation references above settle their contracts for 4.1/4.2. The remaining tasks implement only the approved cancel/advance/replacement extensions, preserving the established receipt, current view, pricing, and error shapes. A later contract change requires a consumer/fixture/documentation impact assessment; ask the user when it exceeds the agreed design or scope.
 
 ## 3. Shared Execution and Assurance Policy
 
@@ -192,6 +198,8 @@ Browser-driven checks used the real Vite proxy and separate API process: two Sma
 
 **Requirements covered:** Service portions of FR-6/FR-7 and submission FR-10; charge parity in FR-2; QR-2.
 
+**Execution evidence:** Task 3.1 complete. Its first submit/lookup test failed with 404; current Submission/Quote selection passes **73 tests**. The real HTTP/file-backed SQLite cases prove quote/submit/GET equality and no quote writes, lost acknowledgement plus host restart (even with the original size removed from the replacement catalog), identical/conflicting coordinated submissions, raw tip-text/line/topping-order comparison, unchanged accepted snapshots on conflict, and distinct IDs for new keys. Fixture-controlled write contention produces 503 plus a contextual warning; explicit retry succeeds after lock release. Dropped-table and corrupt-stored-JSON cases produce safe 500 plus contextual error logs. Validation/missing lookup remain 400/404 without invalid rows or error-level validation traces. Each fixture clears only its connection pool and exact DB/WAL/SHM files; all work uses isolated ignored test DBs. POST/GET serialization is now a passing consumer boundary for 3.2, not a guessed payload.
+
 #### Task 3.2: Integrate browser submission and bounded recovery
 
 **Prerequisites:** 3.1
@@ -226,6 +234,10 @@ Browser-driven checks used the real Vite proxy and separate API process: two Sma
 
 **Requirements covered:** Interactive FR-6/FR-7 and submission FR-10; FR-2/FR-4 feedback; IR-1.
 
+**Execution evidence:** Task 3.2 complete. **Ten** WEB helper tests and test type-check/build/lint pass, including frozen attempts, unchanged raw tip/body/key across two sends, fresh keys for deliberate new attempts, and GET-only lookup. Current combined API Menu/Pricing/Quote/Submission selection passes **85 tests**; API build has zero warnings/errors.
+
+Browser checks used separate API/Vite processes and the actual proxy with one isolated ignored DB. Browser-only interception let the API accept a submission, then withheld its acknowledgement: UI displayed unknown outcome, locked the draft, removed new submission, and offered Retry Submission. Retry sent identical key/body, recovered the same ID and receipt, then GET restored Not Started editing. Explicit Check Status worked. A deliberate new order with identical contents used a different key/ID; its receipt arrived but its follow-up GET was withheld. UI retained that ID/receipt, showed accepted/status-unavailable, locked editing/new attempts, and offered Check Status rather than submission replay. Recovery added only one GET, with POST count unchanged. Direct read-only verification found exactly two deliberate orders, not an extra retry row. Editing the recovered draft changed its quote to $7.33 while the accepted snapshot stayed $5.33. All browser interception hooks were removed.
+
 #### Checkpoint C2: Stabilize persistence and retry semantics
 
 **Prerequisites:** 3.2
@@ -243,6 +255,12 @@ Browser-driven checks used the real Vite proxy and separate API process: two Sma
 **Approval:** User confirms stable retry/persistence contracts; any design deviation requires explicit approval.
 
 **Local commit boundary:** Durable submission/status/recovery, only if the user requests a commit.
+
+**Execution evidence:** C2 API/helper/build/lint and browser evidence above are current. Self-inspection checked the single-statement insert's submission-key conflict target, immutable original request/receipt, parameterized values, independent connection ownership, safe storage-error logging, C#/TS parity, and distinct browser recovery branches. The user independently approved C2 with "Approve C2, commit locally, and continue"; no design deviation or repair was requested. Section 2 settles the contracts for 4.1/4.2. Replay after cancellation/replacement is still owed by those tasks. The user authorized the local submission/recovery commit. No remote writes.
+
+Temporary API/Vite processes were stopped; the owned smoke DB/WAL/SHM files were deleted after read-only row verification. The user's runtime `data\pdd.db` and its sidecars were untouched.
+
+**Repair rounds used: 0 of 2.**
 
 ### Slice 4: Editable orders and defensible kitchen transitions
 
@@ -386,10 +404,10 @@ Also require the real two-process journey, stale-quote/timeout recovery checks, 
 | 1.1 | Establish the minimal menu/network spine | None | None | [x] |
 | 1.2 | Prove exact live quotes through the complete multi-line draft builder | 1.1 | None | [x] |
 | C1 | Stabilize quote contracts; independently user-approved | 1.2 | None | [x] |
-| 3.1 | Prove durable submission/status HTTP contracts using C1 contracts | C1 | None | [ ] |
-| 3.2 | Integrate browser submission/recovery against 3.1's proven contracts | 3.1 | None | [ ] |
-| C2 | Review the combined persistence/retry slice before mutations | 3.2 | None | [ ] |
-| 4.1 | Integrate cancellation/advancement; provisional until C2 | C2 | None | [ ] |
+| 3.1 | Prove durable submission/status HTTP contracts using C1 contracts | C1 | None | [x] |
+| 3.2 | Integrate browser submission/recovery against 3.1's proven contracts | 3.1 | None | [x] |
+| C2 | Stabilize persistence/retries; independently user-approved | 3.2 | None | [x] |
+| 4.1 | Integrate cancellation/advancement using C2 contracts | C2 | None | [ ] |
 | 4.2 | Integrate replacement updates using C1 pricing and 4.1's mutation pattern | 4.1 | None | [ ] |
 | 5.1 | Finish README, write-up, AI note, and delivery evidence | 4.2 | None | [ ] |
 | C3 | Verify and independently review the complete local handoff | 5.1 | None | [ ] |

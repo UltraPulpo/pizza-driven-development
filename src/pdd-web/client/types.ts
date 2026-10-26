@@ -39,3 +39,22 @@ export interface PriceQuote {
   totalCents: number
   description: string
 }
+
+export type OrderStatus = 'NotStarted' | 'Started' | 'ReadyForPickup' | 'Delivered' | 'Cancelled'
+
+export interface SubmissionReceipt {
+  orderId: string
+  quote: PriceQuote
+}
+
+export interface OrderView {
+  orderId: string
+  status: OrderStatus
+  order: OrderInput
+  quote: PriceQuote
+}
+
+export interface SubmissionAttempt {
+  readonly key: string
+  readonly body: string
+}

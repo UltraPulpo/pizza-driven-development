@@ -33,7 +33,15 @@ public sealed class SqliteConnectionFactory
     public async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken = default)
     {
         var connection = new SqliteConnection(ConnectionString);
-        await connection.OpenAsync(cancellationToken);
-        return connection;
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
     }
 }

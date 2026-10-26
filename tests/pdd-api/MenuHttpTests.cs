@@ -36,7 +36,7 @@ public class MenuHttpTests
 
         using var health = await client.GetAsync("/api/health");
         Assert.That(health.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        await using var connection = new SqliteConnection($"Data Source={app.DatabasePath}");
+        await using var connection = new SqliteConnection(app.ConnectionString);
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode;";

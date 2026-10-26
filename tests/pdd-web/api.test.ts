@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, getMenu, quoteOrder, RequestTimeoutError } from '../../src/pdd-web/client/api'
+import { ApiError, createSubmissionAttempt, getMenu, getOrder, quoteOrder, RequestTimeoutError, submitAttempt } from '../../src/pdd-web/client/api'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -7,6 +7,49 @@ afterEach(() => {
 })
 
 describe('API requests', () => {
+  it('retries a captured body/key unchanged even if the draft changes', async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ orderId: 'accepted' })))
+    vi.stubGlobal('fetch', fetch)
+    const input = {
+      items: [{ sizeId: 'small', quantity: 1, toppingIds: [] }],
+      tip: { mode: 'dollars' as const, value: '1.0050' }, promoCode: null,
+    }
+    const attempt = createSubmissionAttempt(input)
+    input.tip.value = '2'
+    await submitAttempt(attempt)
+    await submitAttempt(attempt)
+    for (const [path, options] of fetch.mock.calls) {
+      expect(path).toBe('/api/orders')
+      expect(options).toMatchObject({
+        method: 'POST', body: attempt.body,
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attempt.key },
+      })
+      expect(JSON.parse(options.body).tip.value).toBe('1.0050')
+    }
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(Object.isFrozen(attempt)).toBe(true)
+  })
+
+  it('gives a deliberate new submission a fresh key for identical contents', () => {
+    const input = {
+      items: [{ sizeId: 'small', quantity: 1, toppingIds: [] }],
+      tip: { mode: 'dollars' as const, value: '0' }, promoCode: null,
+    }
+    const first = createSubmissionAttempt(input)
+    const second = createSubmissionAttempt(input)
+    expect(first.key).not.toBe(second.key)
+    expect(first.body).toBe(second.body)
+  })
+
+  it('looks up current state without replaying a submission', async () => {
+    const current = { orderId: 'order-id', status: 'NotStarted' }
+    const fetch = vi.fn().mockResolvedValue(Response.json(current))
+    vi.stubGlobal('fetch', fetch)
+    expect(await getOrder('order-id')).toEqual(current)
+    expect(fetch).toHaveBeenCalledWith('/api/orders/order-id', expect.not.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('quotes the order with raw tip text unchanged and no client prices', async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ totalCents: 634 }))
     vi.stubGlobal('fetch', fetch)

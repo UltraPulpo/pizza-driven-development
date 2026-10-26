@@ -1,4 +1,4 @@
-import type { MenuDefinition, OrderInput, PriceQuote } from './types'
+import type { MenuDefinition, OrderInput, OrderView, PriceQuote, SubmissionAttempt, SubmissionReceipt } from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -61,4 +61,20 @@ export function quoteOrder(input: OrderInput, signal?: AbortSignal): Promise<Pri
     body: JSON.stringify(input),
     signal,
   })
+}
+
+export function createSubmissionAttempt(input: OrderInput): SubmissionAttempt {
+  return Object.freeze({ key: crypto.randomUUID(), body: JSON.stringify(input) })
+}
+
+export function submitAttempt(attempt: SubmissionAttempt): Promise<SubmissionReceipt> {
+  return request('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attempt.key },
+    body: attempt.body,
+  })
+}
+
+export function getOrder(id: string): Promise<OrderView> {
+  return request(`/api/orders/${encodeURIComponent(id)}`)
 }

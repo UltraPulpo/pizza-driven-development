@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PDD.API.Models;
 
 public sealed record OrderInput(IReadOnlyList<LineItemInput> Items, TipInput Tip, string? PromoCode = null);
@@ -18,6 +20,12 @@ public sealed record PricedLine(
     string SizeId, string SizeName, int BasePriceCents, IReadOnlyList<PricedTopping> Toppings,
     int UnitPriceCents, int Quantity, int LineTotalCents);
 public sealed record PricedTopping(string Id, string Name, int ChargeCents);
+
+public sealed record SubmissionReceipt(Guid OrderId, PriceQuote Quote);
+public sealed record OrderView(Guid OrderId, OrderStatus Status, OrderInput Order, PriceQuote Quote);
+
+[JsonConverter(typeof(JsonStringEnumConverter<OrderStatus>))]
+public enum OrderStatus { NotStarted, Started, ReadyForPickup, Delivered, Cancelled }
 
 public enum OrderError { Validation, NotFound, Conflict }
 
