@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, createSubmissionAttempt, getMenu, getOrder, quoteOrder, submitAttempt } from './api'
+import { ApiError, cancelOrder, createSubmissionAttempt, getMenu, getOrder, quoteOrder, submitAttempt, updateOrder } from './api'
 import type { MenuDefinition, OrderInput, OrderStatus, OrderView, PriceQuote, SubmissionAttempt, SubmissionReceipt, TipInput } from './types'
 import './App.css'
 
@@ -20,7 +20,8 @@ type SubmissionState =
   | { phase: 'draft'; error?: string }
   | { phase: 'sending'; attempt: SubmissionAttempt }
   | { phase: 'unknown'; attempt: SubmissionAttempt; error: string }
-  | { phase: 'accepted'; receipt: SubmissionReceipt; current: OrderView | null; checking: boolean; error?: string }
+  | { phase: 'accepted'; receipt: SubmissionReceipt; current: OrderView | null; checking: boolean;
+      action?: 'cancel' | 'update'; error?: string; notice?: string }
 
 const statusLabels: Record<OrderStatus, string> = {
   NotStarted: 'Not Started', Started: 'Started', ReadyForPickup: 'Ready for Pickup',
@@ -104,16 +105,31 @@ function App() {
   const currentResult = quoteResult?.revision === draft.revision ? quoteResult : null
   const currentQuote = currentResult?.quote
   const accepted = submission.phase === 'accepted' ? submission : null
-  const currentStatusKnown = accepted !== null && accepted.current !== null && !accepted.checking && !accepted.error
+  const currentStatusKnown = accepted !== null && accepted.current !== null && !accepted.checking && !accepted.action && !accepted.error
   const canEditDraft = submission.phase === 'draft' || (currentStatusKnown && accepted?.current?.status === 'NotStarted')
 
-  async function checkStatus(receipt: SubmissionReceipt, previous: OrderView | null = null) {
-    setSubmission({ phase: 'accepted', receipt, current: previous, checking: true })
+  async function checkStatus(receipt: SubmissionReceipt, previous: OrderView | null = null, notice?: string) {
+    setSubmission({ phase: 'accepted', receipt, current: previous, checking: true, notice })
     try {
       const current = await getOrder(receipt.orderId)
+      setSubmission({ phase: 'accepted', receipt, current, checking: false, notice })
+    } catch (error) {
+      setSubmission({ phase: 'accepted', receipt, current: previous, checking: false, error: errorMessage(error), notice })
+    }
+  }
+
+  async function mutateAccepted(action: 'cancel' | 'update', receipt: SubmissionReceipt, previous: OrderView) {
+    setSubmission({ phase: 'accepted', receipt, current: previous, checking: false, action })
+    try {
+      const current = action === 'cancel' ? await cancelOrder(receipt.orderId)
+        : await updateOrder(receipt.orderId, toOrderInput(draft.order))
       setSubmission({ phase: 'accepted', receipt, current, checking: false })
     } catch (error) {
-      setSubmission({ phase: 'accepted', receipt, current: previous, checking: false, error: errorMessage(error) })
+      const operation = action === 'cancel' ? 'Cancellation' : 'Update'
+      const notice = error instanceof ApiError && error.status < 500
+        ? `${operation} rejected: ${error.message}`
+        : `${operation} response could not be confirmed: ${errorMessage(error)}`
+      await checkStatus(receipt, previous, notice)
     }
   }
 
@@ -182,8 +198,13 @@ function App() {
           })} /></label>
           <p>One optional code: ILOVEPIZZA or SAVE5. Percentage tips use the discounted food subtotal before tax.</p>
         </fieldset>
+        {(submission.phase === 'draft' || accepted) && <button type="button"
+          disabled={!!accepted && (!currentStatusKnown || !currentQuote || accepted.current?.status !== 'NotStarted')}
+          onClick={() => {
+            if (accepted?.current) void mutateAccepted('update', accepted.receipt, accepted.current)
+            else changeDraft(draft.order, true)
+          }}>Save Changes</button>}
         {submission.phase === 'draft' && <>
-          <button type="button" onClick={() => changeDraft(draft.order, true)}>Save Changes</button>
           <button type="button" disabled={!currentQuote} onClick={() => {
             void sendSubmission(createSubmissionAttempt(toOrderInput(draft.order)))
           }}>Submit Order</button>
@@ -202,13 +223,18 @@ function App() {
           <h2>Order accepted</h2>
           <p>Order ID: {accepted.receipt.orderId}</p>
           {accepted.checking && <p role="status">Checking current status. Editing is locked.</p>}
+          {accepted.action && <p role="status">{accepted.action === 'cancel' ? 'Cancelling order...' : 'Saving changes...'}</p>}
+          {accepted.notice && <p role="alert">{accepted.notice}</p>}
           {accepted.error && <p role="alert">Order accepted, but current status is unavailable. {accepted.error} Use Check Status to recover.</p>}
           {accepted.current ? <>
             <p>{currentStatusKnown ? 'Current' : 'Last known'} status: {statusLabels[accepted.current.status]}</p>
             <p>Accepted total: {dollars(accepted.current.quote.totalCents)}</p>
             <p>{accepted.current.quote.description}</p>
           </> : <p>Original receipt total: {dollars(accepted.receipt.quote.totalCents)}</p>}
-          <button type="button" disabled={accepted.checking} onClick={() => { void checkStatus(accepted.receipt, accepted.current) }}>Check Status</button>
+          <button type="button" disabled={accepted.checking || !!accepted.action} onClick={() => { void checkStatus(accepted.receipt, accepted.current) }}>Check Status</button>
+          <button type="button" disabled={!currentStatusKnown || accepted.current?.status !== 'NotStarted'} onClick={() => {
+            if (accepted.current) void mutateAccepted('cancel', accepted.receipt, accepted.current)
+          }}>Cancel Order</button>
           <button type="button" disabled={!currentStatusKnown} onClick={() => setSubmission({ phase: 'draft' })}>Start New Order</button>
         </section>}
 

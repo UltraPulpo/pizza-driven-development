@@ -206,9 +206,12 @@ public class SubmissionHttpTests
         Assert.That(await app.CountOrdersAsync(), Is.EqualTo(1));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task Get_UnexpectedStorageFailure_ReturnsSafe500WithErrorContext(bool corruptJson)
+    [TestCase(null)]
+    [TestCase("broken-json")]
+    [TestCase("{}")]
+    [TestCase("""{"order":null,"quote":null}""")]
+    [TestCase("null")]
+    public async Task Get_UnexpectedStorageFailure_ReturnsSafe500WithErrorContext(string? corruptJson)
     {
         using var app = new ApiFixture();
         using var client = app.CreateClient();
@@ -217,7 +220,9 @@ public class SubmissionHttpTests
         {
             await connection.OpenAsync();
             await using var command = connection.CreateCommand();
-            command.CommandText = corruptJson ? "UPDATE Orders SET order_json = 'broken-json';" : "DROP TABLE Orders;";
+            command.CommandText = corruptJson is not null ? "UPDATE Orders SET order_json = $json;" : "DROP TABLE Orders;";
+            if (corruptJson is not null)
+                command.Parameters.AddWithValue("$json", corruptJson);
             await command.ExecuteNonQueryAsync();
         }
         using var response = await client.GetAsync(accepted.Headers.Location);

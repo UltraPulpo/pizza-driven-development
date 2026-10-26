@@ -78,3 +78,15 @@ export function submitAttempt(attempt: SubmissionAttempt): Promise<SubmissionRec
 export function getOrder(id: string): Promise<OrderView> {
   return request(`/api/orders/${encodeURIComponent(id)}`)
 }
+
+export function cancelOrder(id: string): Promise<OrderView> {
+  return request(`/api/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+export function updateOrder(id: string, input: OrderInput): Promise<OrderView> {
+  return request(`/api/orders/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}

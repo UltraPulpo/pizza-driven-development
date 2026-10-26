@@ -188,6 +188,15 @@ public class PricingTests
         Assert.That(quote.TotalCents, Is.EqualTo(1283));
     }
 
+    [TestCase("dollars", "-0.00")]
+    [TestCase("percent", "-0")]
+    public void Quote_SignedZeroTip_IsNonnegative(string mode, string value)
+    {
+        var quote = pricing.Quote(Order(tipMode: mode, tip: value));
+        Assert.That(quote.TipCents, Is.Zero);
+        Assert.That(quote.TotalCents, Is.EqualTo(533));
+    }
+
     private sealed class LargeOnlyRule : IPromoRule
     {
         public string Code => "LARGEONLY";

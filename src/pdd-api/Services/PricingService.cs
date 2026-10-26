@@ -96,7 +96,7 @@ public sealed class PricingService
             throw Invalid("Enter a nonnegative decimal tip value using a dot, for example 1.50 or 15.");
 
         // Decimal.TryParse can round excess precision; reject it rather than silently changing the input.
-        var parts = value.TrimStart('+').Split('.');
+        var parts = value.TrimStart('+', '-').Split('.');
         var whole = parts[0].TrimStart('0');
         var fraction = parts.Length == 2 ? parts[1].TrimEnd('0') : "";
         var normalized = (whole.Length == 0 ? "0" : whole) + (fraction.Length == 0 ? "" : "." + fraction);

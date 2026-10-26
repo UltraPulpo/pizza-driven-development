@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, createSubmissionAttempt, getMenu, getOrder, quoteOrder, RequestTimeoutError, submitAttempt } from '../../src/pdd-web/client/api'
+import { ApiError, cancelOrder, createSubmissionAttempt, getMenu, getOrder, quoteOrder, RequestTimeoutError, submitAttempt, updateOrder } from '../../src/pdd-web/client/api'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -7,6 +7,28 @@ afterEach(() => {
 })
 
 describe('API requests', () => {
+  it('sends a complete replacement once without changing tip text', async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ status: 'NotStarted' }))
+    vi.stubGlobal('fetch', fetch)
+    const input = {
+      items: [{ sizeId: 'large', quantity: 2, toppingIds: ['bacon'] }],
+      tip: { mode: 'dollars' as const, value: '1.0050' }, promoCode: null,
+    }
+    await updateOrder('order-id', input)
+    expect(fetch).toHaveBeenCalledWith('/api/orders/order-id', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify(input), headers: { 'Content-Type': 'application/json' },
+    }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels once and leaves recovery to an explicit status lookup', async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ status: 'Cancelled' }))
+    vi.stubGlobal('fetch', fetch)
+    await expect(cancelOrder('order-id')).resolves.toEqual({ status: 'Cancelled' })
+    expect(fetch).toHaveBeenCalledWith('/api/orders/order-id/cancel', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('retries a captured body/key unchanged even if the draft changes', async () => {
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ orderId: 'accepted' })))
     vi.stubGlobal('fetch', fetch)

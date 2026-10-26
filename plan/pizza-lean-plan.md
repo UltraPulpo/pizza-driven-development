@@ -16,9 +16,13 @@
 
 **Unresolved decisions:** None blocking this revision. It applies only the six confirmed interview decisions; no additional UI behavior is prescribed. The user approved at most **two automatic repair rounds per checkpoint**. Significant design/scope changes still require an immediate user decision. C1 and C2 explicitly settle unproven implementation contracts before dependent work; their existence is not a claim those contracts already work.
 
-**Execution continuation:** Tasks 1.1/1.2/C1/3.1/3.2/C2 are complete. The user approved C2 and explicitly requested its local commit, then continuation. Task 4.1 is ready against the established C1/C2 contracts; lifecycle mutations remain unimplemented until 4.1/4.2 prove them.
+**Execution continuation:** All tasks and checkpoints are complete under the documentation exception below. The user approved C3 and explicitly requested the final local lifecycle/handoff commit. Assessment prose and personal verification remain candidate-owned; no remote publication is authorized.
 
-**Local history:** Authorized C1 increment committed as `0822511` (`Add data-driven menu and exact live order quotes`). Working tree was clean immediately afterward. Later work remains uncommitted unless separately requested.
+**User-directed delivery adjustment:** Asked for personal-verification evidence, the user said: "I haven't done that yet and I plan on doing the write-up myself, so just a template for now is fine". D3/design write-up and D4/AI note are therefore candidate-owned templates for this run, with personal verification explicitly pending. This overrides completed prose/personal-evidence acceptance in 5.1/C3 only for the present local handoff; it does not claim those assessment deliverables are finished or waive the user's final responsibility before submission.
+
+**Local history:** Authorized C1 increment committed as `0822511` (`Add data-driven menu and exact live order quotes`). Working tree was clean immediately afterward.
+
+Authorized C2 increment committed as `d3ca9a2` (`Add durable submission retries and status recovery`); working tree was clean immediately afterward. C3 approval authorizes the final lifecycle/handoff increment; its containing commit is identified in local Git history.
 
 ## 2. Implementation Sequence and Shared Contracts
 
@@ -33,10 +37,10 @@
 | Existing connection factory, initializer, embedded resource, proxy, ports, runners | Established in source; runtime evidence not gathered here | Preserve existing owners/configuration; extend only where a task needs it. |
 | Menu, OrderInput, TipInput, PriceQuote, camelCase JSON and integer-cent wire fields | Established; C1 user-approved | Tasks 1.1/1.2 evidence and canonical implementation references below. |
 | `PricingService.Quote(OrderInput)` and `IPromoRule.GetDiscount(OrderInput, int subtotalCents)` | Established; C1 user-approved | API owns all validation, exact arithmetic, descriptions, promo eligibility, and structural single-promo exclusivity. |
-| Problem Details, `OrderException` kinds, WEB `ApiError`, finite 10-second timeout | Quote/input/helper paths established; C1 user-approved | API owns binding/business/error mapping; WEB preserves messages and distinguishes transport uncertainty. C2 still owes storage-failure behavior. |
-| OrderService async submit/get/update/cancel/advance methods, with cancellation tokens | Submit/get established; C2 user-approved. Mutations unimplemented. | Task 3.1 proves submit/get before browser consumption in 3.2; 4.1 adds cancel/advance and 4.2 adds update using the existing pricing path. |
+| Problem Details, `OrderException` kinds, WEB `ApiError`, finite 10-second timeout | Established; C1/C2/C3 user-approved | API owns binding/business/storage error mapping; WEB preserves messages and distinguishes transport uncertainty. Final stored-read hardening is covered by 5.1 evidence. |
+| OrderService async submit/get/update/cancel/advance methods, with cancellation tokens | Established; C3 user-approved | 3.1 submit/get, 4.1 cancel/advance, and 4.2 update share stored DTOs, pricing, and error mapping. |
 | Receipt, current OrderView, immutable SubmissionAttempt, retry header and storage | Established; C2 user-approved | Task 3.1 owns persistence/HTTP contracts; 3.2 owns browser recovery. 4.1/4.2 preserve original retry information. |
-| Status strings, expected-status advancement, conditional mutation outcomes | Specified by LLD 4.1/4.4/5; unimplemented | Task 4.1 proves progression/cancellation and the shared conditional-write/error pattern; 4.2 reuses it for updates. C3 reviews the integrated guarantees. |
+| Status strings, expected-status advancement, conditional mutation outcomes | Established; C3 user-approved | Conditional writes return changed rows; fallback reads classify missing/conflict, never authorize mutation. C3 approved the integrated guarantees. |
 
 Use the LLD's existing endpoint contracts, not a new API design: GET menu, POST quote, POST orders with GUID `Idempotency-Key`, GET/PUT order, POST cancel, and POST advance with `expectedStatus`, all under `/api`. Keep health. Money is checked nonnegative int cents, calculated with decimal intermediates and midpoint-away-from-zero rounding; tip `value` stays decimal text. Quote, submit, and update share one pricing method. WEB only formats returned cents.
 
@@ -50,7 +54,7 @@ Only declare types as they acquire a real consumer. Group related records; no ge
 
 **C2 canonical browser references (user-approved):** Receipt/current-state/status/readonly-attempt types in [`types.ts`](../src/pdd-web/client/types.ts) mirror the passing C# wire contracts. [`api.ts`](../src/pdd-web/client/api.ts) captures/freeze-serializes an attempt once and resends its body/key without automatic writes. [`App.tsx`](../src/pdd-web/client/App.tsx) distinguishes unknown submission from accepted/status-unavailable, locks edits/new submissions until recovery, and keeps accepted state separate from the draft. The existing helper suite and 3.2 browser evidence below cover both recovery branches. Tasks 4.1/4.2 reuse this accepted-state/draft separation and current-quote gate. No C1 wire shape changed.
 
-C1/C2 are now user-approved and the implementation references above settle their contracts for 4.1/4.2. The remaining tasks implement only the approved cancel/advance/replacement extensions, preserving the established receipt, current view, pricing, and error shapes. A later contract change requires a consumer/fixture/documentation impact assessment; ask the user when it exceeds the agreed design or scope.
+C1/C2 settled the contracts consumed by 4.1/4.2. Those tasks implemented the approved cancel/advance/replacement extensions, preserving the established receipt, current view, pricing, and error shapes; C3's user approval settles their integrated handoff. A later contract change requires a consumer/fixture/documentation impact assessment; ask the user when it exceeds the agreed design or scope.
 
 ## 3. Shared Execution and Assurance Policy
 
@@ -297,6 +301,10 @@ Temporary API/Vite processes were stopped; the owned smoke DB/WAL/SHM files were
 
 **Requirements covered:** FR-7/FR-9; cancellation portions of FR-8/FR-10; customer feedback in FR-4; QR-2.
 
+**Execution evidence:** Task 4.1 complete. Advancement first failed with 404. Current Lifecycle/Submission selection passes **31 tests**, covering adjacent stages, repeated old expected status, terminal states, repeated cancellation, immutable receipt replay after cancellation, both forced cancel/start orderings and coordinated overlap with one winner, malformed expected status, and missing IDs. WEB **11** helper tests/type-check/build/lint pass. SQL inspection confirms conditional status predicates, parameterized writes, returned changed rows, and untouched original request/receipt. The shared `ReadViewAsync`/`FindByIdAsync` pattern is established for 4.2.
+
+Real-proxy browser checks: cancellation acknowledgement was withheld after acceptance; exactly one cancel and one recovery GET showed Cancelled while preserving quantity `2` in the unsaved draft (accepted quantity stayed `1`). A separate order was started behind the UI; cancellation returned 409, refreshed Started, and locked editing without losing the draft. Manual expected-status calls exercised ReadyForPickup, Delivered, stale-expected 409, and terminal 409; Check Status displayed Delivered. Interception was removed. API was stopped for the next build; Vite remains attached only for the continuing local checks.
+
 #### Task 4.2: Integrate replacement updates using the proven lifecycle pattern
 
 **Prerequisites:** 4.1
@@ -329,6 +337,10 @@ Temporary API/Vite processes were stopped; the owned smoke DB/WAL/SHM files were
 
 **Requirements covered:** Post-submit FR-1/FR-2/FR-4; replacement-update portions of FR-8/FR-10; QR-2.
 
+**Execution evidence:** Task 4.2 complete. Its first PUT/quote/lookup/replay test failed with 405. Current Lifecycle/Submission/Quote selection passes **89 tests**; **12** WEB helper tests, test type-check, build, and lint pass. HTTP cases prove full quote/PUT/GET equality (including the fixed 3,123-cent replacement), invalid updates leaving snapshots unchanged, every progressed/terminal status rejecting updates, original receipt replay after replacement without mutation/extra rows, both forced update/start orderings, and coordinated overlap retaining only a pre-start replacement. SQL uses `WHERE id = $id AND status = 'NotStarted'`, returns the changed row, and never alters original retry information.
+
+Real-proxy browser checks saved dollar tip `1.005` as an accepted $6.34 quote. Invalid tip text `-` stayed editable, showed a clear error, disabled Save Changes, and left accepted contents unchanged. Withholding a successfully committed PUT acknowledgement caused exactly one recovery GET (no second PUT), restored accepted $7.33, and preserved raw draft tip `2`. After changing the draft tip to `3`, a manual kitchen start made Save Changes return 409; refresh displayed Started with accepted $7.33 while preserving the unsaved $8.33 draft. Interception hooks were removed. Temporary API/Vite processes were stopped and only the owned smoke DB/WAL/SHM files were deleted; runtime DB was untouched.
+
 ### Slice 5: Local release hardening and assessment handoff
 
 #### Task 5.1: Finish the required write-up and local delivery evidence
@@ -342,6 +354,8 @@ Temporary API/Vite processes were stopped; the owned smoke DB/WAL/SHM files were
 **Contracts:** Document implemented contracts and confirmed assumptions, not planned behavior. Use the shared policy for any discovered repair.
 
 **Expected files:** Primarily `README.md`; only directly related code/test/config fixes justified by discovered delivery defects. Do not rewrite the design documents to disguise an implementation gap.
+
+**User-approved documentation override:** Provide clearly marked design/AI-note templates, not completed personal prose. Preserve the required questions/prompts and explicit pending personal verification. All other run/API/assumptions/invariant documentation and local checks remain required; report the unfinished assessment deliverables honestly.
 
 **Objective:** A grader can start both processes, run checks, exercise the API, and understand guarantees/cuts without reading the planning documents.
 
@@ -364,11 +378,17 @@ Temporary API/Vite processes were stopped; the owned smoke DB/WAL/SHM files were
 
 **Requirements covered:** D-1 through D-5, QR-3/QR-4, IR-1; documentation of lifecycle, pricing, and extensibility guarantees.
 
+**Execution evidence:** Task 5.1 complete under the user-approved template exception. README documents root-level startup/check commands, every operation, retry/status semantics, assumptions, invariant rationale, omissions, and the four design/AI prompts. It explicitly leaves D3/D4 prose and personal verification to the candidate before assessment submission. Local hardening accepts signed-zero tips as nonnegative and rejects missing/null required stored JSON fields with the existing safe-500/logging boundary rather than returning a malformed successful view. These bounded fixes have regression cases; incoming validation and typed retry serialization are unchanged.
+
+Final Release build has **zero warnings/errors** and the complete API suite passes **106 tests**. Current unchanged WEB evidence is **12** helper tests, test type-check, production build, and lint passing. A fresh isolated API/Vite start using README commands served menu/health through the proxy. The README HTTP walkthrough verified the 3,123-cent reference, submit/GET/same-attempt replay, 1,562-cent replacement, repeated cancellation, original-receipt replay after mutation, all three kitchen stages, and representative 400/409 responses. Earlier browser journey/recovery evidence in 1.2/3.2/4.1/4.2 remains applicable; strict stored-read hardening is additionally covered by the complete HTTP suite. Temporary processes were stopped and only the owned smoke DB/WAL/SHM files were deleted; the runtime DB and sidecars were untouched.
+
 #### Checkpoint C3: Verify the complete local handoff
 
 **Prerequisites:** 5.1
 
 **Conflicts with:** None
+
+**User-approved documentation exception:** Review the D3/D4 template handoff under 5.1's explicit override. C3 may accept the technical local handoff with those candidate-owned items still pending; it must not certify a finished assessment submission or invented personal verification.
 
 **Required evidence:** Current complete applicable local gates:
 
@@ -395,6 +415,10 @@ Also require the real two-process journey, stale-quote/timeout recovery checks, 
 
 **Local commit boundary:** Lifecycle and final handoff may be separate coherent increments, only when requested by the user; inspect each authorized staged increment against current evidence.
 
+**Execution evidence:** Required local gates and manual integration evidence are gathered above. Self-inspection checked conditional SQL and immutable retry fields, shared pricing, C#/TS status parity, mutation recovery/draft preservation, README examples, and unchanged Ubuntu CI commands; self-inspection did not replace independent review. Presented with the evidence, uncommitted scope, and documentation exception, the user independently approved C3 with "Approve C3 and commit locally". This explicitly authorizes the final local increment. D3/D4 and personal verification remain candidate-owned under the exception; the assessment submission is not certified complete. No remote CI run, publication, or deployment is claimed.
+
+**Repair rounds used: 0 of 2.**
+
 ## 5. Single Status Tracker
 
 **Status values:** `[ ]` Not started | `[~]` In progress | `[x]` Complete
@@ -407,10 +431,10 @@ Also require the real two-process journey, stale-quote/timeout recovery checks, 
 | 3.1 | Prove durable submission/status HTTP contracts using C1 contracts | C1 | None | [x] |
 | 3.2 | Integrate browser submission/recovery against 3.1's proven contracts | 3.1 | None | [x] |
 | C2 | Stabilize persistence/retries; independently user-approved | 3.2 | None | [x] |
-| 4.1 | Integrate cancellation/advancement using C2 contracts | C2 | None | [ ] |
-| 4.2 | Integrate replacement updates using C1 pricing and 4.1's mutation pattern | 4.1 | None | [ ] |
-| 5.1 | Finish README, write-up, AI note, and delivery evidence | 4.2 | None | [ ] |
-| C3 | Verify and independently review the complete local handoff | 5.1 | None | [ ] |
+| 4.1 | Integrate cancellation/advancement using C2 contracts | C2 | None | [x] |
+| 4.2 | Integrate replacement updates using C1 pricing and 4.1's mutation pattern | 4.1 | None | [x] |
+| 5.1 | Finish README/evidence with user-approved design/AI templates | 4.2 | None | [x] |
+| C3 | Complete local handoff; independently user-approved with template exception | 5.1 | None | [x] |
 
 An entry is ready only when its prerequisites are complete, no conflict is active, and no unresolved decision blocks it. Checkpoints are not complete just because their prerequisite tasks finish. If a new decision appears, record its owner/affected IDs in Overview and annotate only those tracker descriptions; do not mark blocked/unverified work complete.
 

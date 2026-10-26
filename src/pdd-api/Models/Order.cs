@@ -23,6 +23,7 @@ public sealed record PricedTopping(string Id, string Name, int ChargeCents);
 
 public sealed record SubmissionReceipt(Guid OrderId, PriceQuote Quote);
 public sealed record OrderView(Guid OrderId, OrderStatus Status, OrderInput Order, PriceQuote Quote);
+public sealed record AdvanceInput(string ExpectedStatus);
 
 [JsonConverter(typeof(JsonStringEnumConverter<OrderStatus>))]
 public enum OrderStatus { NotStarted, Started, ReadyForPickup, Delivered, Cancelled }

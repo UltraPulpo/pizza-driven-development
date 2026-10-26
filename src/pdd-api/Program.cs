@@ -61,10 +61,17 @@ app.MapPost("/api/orders", async (HttpRequest request, OrderInput input, OrderSe
     return Results.Created($"/api/orders/{receipt.OrderId}", receipt);
 });
 app.MapGet("/api/orders/{id}", async (string id, OrderService orders, CancellationToken cancellationToken) =>
+    await orders.GetAsync(ParseOrderId(id), cancellationToken));
+app.MapPut("/api/orders/{id}", async (string id, OrderInput input, OrderService orders, CancellationToken cancellationToken) =>
+    await orders.UpdateAsync(ParseOrderId(id), input, cancellationToken));
+app.MapPost("/api/orders/{id}/cancel", async (string id, OrderService orders, CancellationToken cancellationToken) =>
+    await orders.CancelAsync(ParseOrderId(id), cancellationToken));
+app.MapPost("/api/orders/{id}/advance", async (string id, AdvanceInput input, OrderService orders, CancellationToken cancellationToken) =>
 {
-    if (!Guid.TryParse(id, out var orderId))
-        throw new OrderException(OrderError.Validation, "The order ID must be a GUID.");
-    return await orders.GetAsync(orderId, cancellationToken);
+    if (!Enum.TryParse<OrderStatus>(input.ExpectedStatus, out var expected) ||
+        !Enum.IsDefined(expected) || input.ExpectedStatus != expected.ToString())
+        throw new OrderException(OrderError.Validation, "Provide an exact expectedStatus, for example NotStarted.");
+    return await orders.AdvanceAsync(ParseOrderId(id), expected, cancellationToken);
 });
 
 app.MapGet("/api/health", async (SqliteConnectionFactory db, CancellationToken cancellationToken) =>
@@ -77,5 +84,8 @@ app.MapGet("/api/health", async (SqliteConnectionFactory db, CancellationToken c
 });
 
 app.Run();
+
+static Guid ParseOrderId(string id) => Guid.TryParse(id, out var value) ? value :
+    throw new OrderException(OrderError.Validation, "The order ID must be a GUID.");
 
 public partial class Program;
